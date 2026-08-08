@@ -23,5 +23,8 @@
   "homepage": "https://github.com/Pixellord95/3D-Shooting-Game#readme",
   "devDependencies": {
     "supabase": "^2.113.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.2"
   }
 }

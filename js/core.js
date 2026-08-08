@@ -20,7 +20,7 @@ const MAP_HALF = 160, BOUND = 152;
 /* ---- state ---- */
 const MODE = { WEAPON: 'weapon', BUILD: 'build', VEHICLE: 'vehicle', HELI: 'heli' };
 let mode = MODE.WEAPON;
-let state = 'start'; // start | playing | paused | over
+let state = 'start'; // auth | start | playing | paused | over
 let keys = {}, velY = 0, onGround = true;
 let shooting = false, aiming = false, recoil = 0;
 let health, score, wave, enemies = [], nextWaveAt = 0;

@@ -504,6 +504,7 @@ function startWave() {
   sWave();
   hudWave.textContent = wave;
   updateAliveHud(enemies.length + spawnQueue.length);
+  if (typeof recordGameEvent === 'function') recordGameEvent('wave_started', { wave });
 }
 
 function killEnemy(e) {
@@ -1043,6 +1044,9 @@ function updateEnemies(dt, now) {
       updateHealth();
       grantWaveAmmo();
       banner('WAVE CLEARED  +20 HP · +AMMO');
+      if (typeof recordGameEvent === 'function') recordGameEvent('wave_completed', { wave, score });
+      if (typeof markCloudDirty === 'function') markCloudDirty();
+      if (typeof saveCloudGame === 'function') saveCloudGame(false);
     } else if (now >= nextWaveAt) {
       nextWaveAt = 0;
       startWave();

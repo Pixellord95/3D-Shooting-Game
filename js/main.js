@@ -17,9 +17,12 @@ function gameOver() {
   document.getElementById('over-stats').textContent =
     `You reached wave ${wave} with a score of ${score}.`;
   show('ov-over');
+  if (typeof recordGameEvent === 'function') recordGameEvent('player_died', { wave, score });
+  if (typeof markCloudDirty === 'function') markCloudDirty();
+  if (typeof saveCloudGame === 'function') saveCloudGame(true);
 }
 
-function reset() {
+function reset(startImmediately) {
   for (const e of enemies) removeEnemy(e);
   enemies = [];
   resetBuilds();
@@ -41,7 +44,7 @@ function reset() {
   resetHud();
   updateDayNight();
   drawMinimap();
-  startWave();
+  if (startImmediately !== false) startWave();
 }
 
 /* ---- shared input actions: desktop (keyboard/mouse) and touch (mobile.js)
@@ -108,6 +111,8 @@ function pauseGame() {
   releaseAllTouchInput();
   if (document.pointerLockElement) document.exitPointerLock();
   show('ov-pause');
+  if (typeof markCloudDirty === 'function') markCloudDirty();
+  if (typeof saveCloudGame === 'function') saveCloudGame(false);
 }
 
 /* ---- input router (desktop) ---- */
@@ -170,8 +175,18 @@ document.addEventListener('mousemove', e => {
 
 for (const ov of document.querySelectorAll('.overlay')) {
   ov.addEventListener('click', () => {
+    if (typeof isGameAuthenticated === 'function' && !isGameAuthenticated()) {
+      showAuthOverlay('Logga in för att spela.');
+      return;
+    }
     ensureAudio();
-    if (state === 'start' || state === 'over') reset();
+    if (state === 'start') {
+      const started = startAuthenticatedGame(false);
+      if (!started) return;
+    } else if (state === 'over') {
+      const started = startAuthenticatedGame(true);
+      if (!started) return;
+    }
     if (TOUCH_DEVICE) {
       // touch: no pointer lock, start/resume immediately from this same user gesture
       state = 'playing';
@@ -201,6 +216,9 @@ document.addEventListener('pointerlockchange', () => {
 addEventListener('blur', () => { if (state === 'playing') pauseGame(); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state === 'playing') pauseGame();
+});
+addEventListener('beforeunload', () => {
+  if (typeof saveLocalCloudBackup === 'function') saveLocalCloudBackup();
 });
 
 /* ---- main loop ---- */

@@ -8,6 +8,38 @@
 </head>
 <body class="overlay-active">
 
+<div id="authOverlay" class="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+  <div class="auth-card">
+    <div class="auth-brand">CUBE ASSAULT</div>
+    <h1 id="authTitle">Ditt spel. Ditt konto.</h1>
+    <p class="auth-intro">Logga in för att spara framsteg och fortsätta på en annan enhet.</p>
+    <div class="auth-tabs" role="tablist" aria-label="Konto">
+      <button type="button" class="auth-tab active" data-auth-tab="login" role="tab">Logga in</button>
+      <button type="button" class="auth-tab" data-auth-tab="register" role="tab">Skapa konto</button>
+    </div>
+    <form id="authLoginForm" class="auth-form">
+      <label>E-post<input name="email" type="email" autocomplete="email" required></label>
+      <label>Lösenord<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+      <button class="auth-submit" type="submit">Logga in</button>
+    </form>
+    <form id="authRegisterForm" class="auth-form" hidden>
+      <label>Användarnamn<input name="username" type="text" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" required></label>
+      <small>3–20 tecken: bokstäver, siffror och _</small>
+      <label>E-post<input name="email" type="email" autocomplete="email" required></label>
+      <label>Lösenord<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="auth-submit" type="submit">Skapa konto</button>
+    </form>
+    <div id="authMessage" class="auth-message" aria-live="polite"></div>
+  </div>
+</div>
+
+<div id="accountBar" class="account-bar" hidden>
+  <span id="accountName">Player</span>
+  <span id="cloudStatus">Laddar…</span>
+  <button id="accountSave" type="button">Spara</button>
+  <button id="accountLogout" type="button">Logga ut</button>
+</div>
+
 <div id="hud">
   <div id="crosshair">
     <i class="t t-l"></i><i class="t t-r"></i><i class="t t-u"></i><i class="t t-d"></i>
@@ -65,8 +97,8 @@
       FIRE to shoot/swing/place · ADS to aim · tap a slot to equip<br>
       Harvest trees, rocks and scrap. Build cover. Survive the waves.
     </p>
-    <div class="go desktop-only">▶ Click to Play</div>
-    <div class="go touch-only">▶ Tap to Play</div>
+    <div id="startAction" class="go">▶ Klicka för att spela</div>
+    <button id="newGameBtn" class="overlay-secondary" type="button" hidden>Nytt spel</button>
   </div>
 </div>
 <div class="overlay" id="ov-pause">
@@ -113,6 +145,8 @@
 </div>
 <div id="rotateOverlay">⟳ Rotate your device</div>
 
+<script src="lib/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="js/core.js"></script>
 <script src="js/audio.js"></script>
@@ -126,6 +160,7 @@
 <script src="js/car.js"></script>
 <script src="js/heli.js"></script>
 <script src="js/mobile.js"></script>
+<script src="js/account.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

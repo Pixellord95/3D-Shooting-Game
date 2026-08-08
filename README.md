@@ -1,6 +1,6 @@
 # Cube Assault 3D
 
-A browser-based first-person shooter / battle-builder built with plain [Three.js](https://threejs.org/) — no build tools, no frameworks, no dependencies beyond the bundled `three.min.js`. Fight waves of enemies and minibosses, harvest resources, build defensive structures (walls, windows, doors, ramps, floors), and drive a car or fly a helicopter gunship around an open 320×320 unit map, all rendered with procedurally generated low-poly models and a tiny synthesized sound engine (Web Audio, no audio files). Fully playable with keyboard/mouse on desktop or touch controls on phones and tablets.
+A browser-based first-person shooter / battle-builder built with plain [Three.js](https://threejs.org/) and Supabase authentication/cloud saves. Fight waves of enemies and minibosses, harvest resources, build defensive structures (walls, windows, doors, ramps, floors), and drive a car or fly a helicopter gunship around an open 320×320 unit map. Fully playable with keyboard/mouse on desktop or touch controls on phones and tablets.
 
 ## Project structure
 
@@ -25,9 +25,15 @@ A browser-based first-person shooter / battle-builder built with plain [Three.js
 │   ├── car.js                    Drivable vehicle
 │   ├── heli.js                    Flyable helicopter gunship
 │   ├── mobile.js                   Touch input layer: joystick, look-zone, action buttons, build panel
+│   ├── supabase-client.js           Public Supabase browser-client configuration
+│   ├── account.js                   Registration, login, session handling, cloud save/load and event log
 │   └── main.js                     Initialization, input routing, main loop (loads last)
 ├── lib/
-│   └── three.min.js       Three.js library (external, unmodified)
+│   ├── three.min.js       Three.js library (external, unmodified)
+│   ├── supabase.js        Vendored Supabase JavaScript browser client
+│   └── supabase.LICENSE   Supabase JavaScript client license
+├── supabase/
+│   └── migrations/        Profiles, per-user saves, event history and RLS policies
 ├── assets/
 │   ├── images/            (currently empty — the game uses no image assets)
 │   ├── audio/              (currently empty — all sound is synthesized at runtime)
@@ -52,11 +58,15 @@ A browser-based first-person shooter / battle-builder built with plain [Three.js
 | `js/car.js` | The drivable vehicle: enter/exit, driving physics, collision, chase camera. |
 | `js/heli.js` | The flyable helicopter gunship: enter/exit, flight physics, collision, mounted machine gun. |
 | `js/mobile.js` | Touch input layer, active only on coarse-pointer/touch devices: the analog left-stick joystick, the drag-to-look right-side "look zone", all action buttons (fire/aim/jump/reload/interact/build/pause/up/down), the build-mode panel, inventory-slot taps, per-frame HUD sync, and guaranteed input release on pointer-up/cancel/pause/blur/reset. Reuses the same shared gameplay actions/globals as desktop input — no gameplay logic is duplicated. |
+| `js/supabase-client.js` | Creates the browser Supabase client with persistent sessions. Contains only the public browser key; authorization is enforced by database RLS. |
+| `js/account.js` | Account UI, email/password registration, unique usernames, login/logout, session restoration, remote save/load, local emergency backup, autosave and meaningful game-event logging. |
 | `js/main.js` | Wires everything together: window resize/orientation handling, the shared input-action functions (`primaryActionDown`/`interact`/`equipSlot`/`reloadOrRotate`/etc.) that both the desktop keyboard/mouse router and `mobile.js` call into, state transitions (`reset`, `gameOver`, `pauseGame`), and the main render loop that calls each subsystem's per-frame update function in order. Loads after every subsystem except `main.js` itself. |
 
 ## Script loading order
 
 ```html
+<script src="lib/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="js/core.js"></script>
 <script src="js/audio.js"></script>
@@ -70,10 +80,19 @@ A browser-based first-person shooter / battle-builder built with plain [Three.js
 <script src="js/car.js"></script>
 <script src="js/heli.js"></script>
 <script src="js/mobile.js"></script>
+<script src="js/account.js"></script>
 <script src="js/main.js"></script>
 ```
 
-These are classic (non-module) scripts that share one global scope — there is no bundler and no `import`/`export`. `three.min.js` must load first since every other file uses the `THREE` global. `mobile.js` loads right before `main.js`: by then every gameplay system it hooks into (weapons, build, car, heli) already exists, and since none of its top-level setup code actually *calls* the handful of functions still to come from `main.js` (only wraps them in closures for later), load order this way is safe. `main.js` loads last since it is the only file that calls `animate()` and wires up input listeners against functions defined in every other file. The order otherwise follows each file's dependencies (e.g. `world.js` populates data that `ui.js`'s minimap needs, so the one-time minimap background render is triggered from `main.js` — after `world.js` has run — rather than at `ui.js` load time).
+These are classic (non-module) scripts that share one global scope — there is no bundler and no `import`/`export`. The vendored Supabase client and its configuration load first. `three.min.js` then loads before every gameplay file that uses the `THREE` global. `account.js` loads after all gameplay systems so it can serialize their state, but before `main.js` wires the final input flow and starts the render loop.
+
+## Accounts and cloud saves
+
+- Registration uses email, password and a case-insensitive unique username.
+- Supabase Auth persists the browser session, while Postgres RLS restricts every profile, save and event row to its owner.
+- Cloud saves include score, health, wave checkpoint, resources, ammo, equipped item, player/car/helicopter positions, harvest state and player-built structures.
+- Autosave runs during play, at wave completion, on pause and on game over. A per-account local backup is used only if the network save cannot be loaded.
+- Mid-wave saves restart the current wave on load rather than serializing live enemy AI/projectiles.
 
 ## Running the game
 

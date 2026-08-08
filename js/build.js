@@ -227,6 +227,76 @@ function updateBuildMode(now) {
   if (shooting && now !== undefined && now - lastPlaceT > 0.18) tryPlace(true);
 }
 
+/* Shared creator for live placement and cloud-save restoration. Restoring a piece
+   bypasses placement/resource checks, but rebuilds the exact same collision/support
+   structures as a piece placed during play. */
+function createBuildPiece(type, matKey, cx, level, cz, rot, options) {
+  const cfg = BUILD_TYPES[type], matDef = MATERIALS[matKey];
+  if (!cfg || !matDef) return null;
+  const key = buildKey(type, cx, level, cz, rot);
+  if (buildKeys.has(key)) return null;
+  const opts = options || {};
+  const piece = pieceGroup(partsFor(type, matKey));
+  piece.position.set(cx, level, cz);
+  piece.rotation.y = rot * Math.PI / 2;
+  piece.scale.setScalar(opts.animate === false ? 1 : 0.35);
+  const maxHp = cfg.hp * matDef.hp;
+  piece.userData = {
+    build: true, type, matKey,
+    hp: Math.max(1, Math.min(maxHp, Number(opts.hp) || maxHp)), maxHp,
+    key, blockers: null, support: null, cracked: false, door: null,
+  };
+  const bls = blockersFor(type, cx, level, cz, rot);
+  for (const bl of bls) { bl.piece = piece; buildBlockers.push(bl); }
+  piece.userData.blockers = bls;
+  if (type === 'door') {
+    const blade = makeDoorBlade(matKey);
+    piece.add(blade);
+    const doorAngle = Number.isFinite(Number(opts.doorAngle)) ? Number(opts.doorAngle) : 0;
+    const open = Math.abs(doorAngle) > 0.05;
+    blade.rotation.y = doorAngle;
+    piece.userData.door = {
+      blade, open, animT: -1, target: doorAngle,
+      bladeBlocker: bls.find(b => b.blade),
+    };
+    if (open) {
+      const j = buildBlockers.indexOf(piece.userData.door.bladeBlocker);
+      if (j !== -1) buildBlockers.splice(j, 1);
+    }
+    doors.push(piece);
+  }
+  piece.traverse(o => { if (o.isMesh) o.userData.rootBuild = piece; });
+  if (type === 'floor' || type === 'ramp') {
+    const s = { kind: type, x: cx, z: cz, y: level, yaw: rot * Math.PI / 2, piece };
+    piece.userData.support = s;
+    supports.push(s);
+  }
+  scene.add(piece);
+  addToSolids(piece);
+  builds.push(piece);
+  buildKeys.set(key, piece);
+  if (opts.animate !== false) buildAnims.push({ piece, t: 0, dying: false });
+  if (piece.userData.hp < maxHp * 0.55) addCracks(piece);
+  return piece;
+}
+
+function restoreBuildsFromSave(savedBuilds) {
+  resetBuilds();
+  if (!Array.isArray(savedBuilds)) return;
+  for (const data of savedBuilds.slice(0, 1000)) {
+    const type = BUILD_TYPES[data && data.type] ? data.type : null;
+    const matKey = MATERIALS[data && data.material] ? data.material : null;
+    if (!type || !matKey) continue;
+    const cx = snap(Number(data.x) || 0), level = snapLevel(Number(data.y) || 0), cz = snap(Number(data.z) || 0);
+    const rot = ((Math.round(Number(data.rotation) || 0) % 4) + 4) % 4;
+    createBuildPiece(type, matKey, cx, level, cz, rot, {
+      hp: data.hp,
+      doorAngle: data.doorAngle,
+      animate: false,
+    });
+  }
+}
+
 function tryPlace(auto) {
   if (mode !== MODE.BUILD || !ghost || !ghost.visible) return;
   const cfg = BUILD_TYPES[buildType];
@@ -242,45 +312,16 @@ function tryPlace(auto) {
   resources[matKey] -= cfg.cost;
   const { x: cx, y: level, z: cz } = ghostCell;
   const matDef = MATERIALS[matKey];
-  const piece = pieceGroup(partsFor(buildType, matKey));
-  piece.position.set(cx, level, cz);
-  piece.rotation.y = getBuildYaw();
-  piece.scale.setScalar(0.35);
-  piece.userData = {
-    build: true, type: buildType, matKey,
-    hp: cfg.hp * matDef.hp, maxHp: cfg.hp * matDef.hp,
-    key: buildKey(buildType, cx, level, cz, buildRot),
-    blockers: null, support: null, cracked: false, door: null,
-  };
-  const bls = blockersFor(buildType, cx, level, cz, buildRot);
-  for (const bl of bls) { bl.piece = piece; buildBlockers.push(bl); }
-  piece.userData.blockers = bls;
-  if (buildType === 'door') {
-    const blade = makeDoorBlade(matKey);
-    piece.add(blade);
-    piece.userData.door = {
-      blade, open: false, animT: -1, target: 0,
-      bladeBlocker: bls.find(b => b.blade),
-    };
-    doors.push(piece);
-  }
-  piece.traverse(o => { if (o.isMesh) o.userData.rootBuild = piece; });
-  if (buildType === 'floor' || buildType === 'ramp') {
-    const s = { kind: buildType, x: cx, z: cz, y: level, yaw: getBuildYaw(), piece };
-    piece.userData.support = s;
-    supports.push(s);
-  }
-  scene.add(piece);
-  addToSolids(piece);
-  builds.push(piece);
-  buildKeys.set(piece.userData.key, piece);
-  buildAnims.push({ piece, t: 0, dying: false });
+  const piece = createBuildPiece(buildType, matKey, cx, level, cz, buildRot, { animate: true });
+  if (!piece) { resources[matKey] += cfg.cost; return; }
   sPlace();
   matDef.sound();
   _v1.set(cx, level + 1.2, cz);
   spawnBurst(_v1, matDef.color, 5, 3);
   updateResHud();
   updateSlotsHud();
+  if (typeof markCloudDirty === 'function') markCloudDirty();
+  if (typeof recordGameEvent === 'function') recordGameEvent('build_placed', { type: buildType, material: matKey, x: cx, y: level, z: cz });
 }
 
 /* ---- doors ---- */
@@ -397,6 +438,7 @@ function removeBuild(piece, silent) {
     _v1.copy(piece.position); _v1.y += 1.2;
     spawnBurst(_v1, MATERIALS[piece.userData.matKey].color, 8, 5);
     sBreak();
+    if (typeof markCloudDirty === 'function') markCloudDirty();
   }
 }
 
@@ -406,6 +448,7 @@ function damageBuild(piece, dmg, point) {
   if (point) spawnBurst(point, MATERIALS[piece.userData.matKey].color, 3, 3);
   if (piece.userData.hp <= 0) removeBuild(piece);
   else if (!piece.userData.cracked && piece.userData.hp < piece.userData.maxHp * 0.55) addCracks(piece);
+  if (typeof markCloudDirty === 'function') markCloudDirty();
 }
 
 function toggleBuildMode() {
