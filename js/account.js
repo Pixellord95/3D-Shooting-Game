@@ -10,6 +10,8 @@ let cloudSaveAgain = false;
 let cloudDirty = false;
 let lastCloudSaveAt = 0;
 let cloudAutosaveTimer = 0;
+let accountValidatedAt = 0;
+let accountValidationPromise = null;
 const pendingGameEvents = [];
 
 const authOverlayEl = document.getElementById('authOverlay');
@@ -57,7 +59,36 @@ function hideAuthOverlay() {
   document.body.classList.remove('auth-locked');
 }
 
-function isGameAuthenticated() { return !!accountUser; }
+function isGameAuthenticated() { return !!accountUser && accountValidatedAt > 0; }
+
+async function invalidateAccount(message) {
+  try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (err) { /* local cleanup continues below */ }
+  deactivateAccount(message || 'Din inloggning är inte längre giltig. Logga in igen.');
+}
+
+function verifyAccountSession(message) {
+  if (!accountUser) return Promise.resolve(false);
+  if (accountValidationPromise) return accountValidationPromise;
+  const expectedUserId = accountUser.id;
+  accountValidationPromise = (async () => {
+    try {
+      const { data, error } = await supabaseClient.auth.getUser();
+      const valid = !error && data.user && data.user.id === expectedUserId && accountUser && accountUser.id === expectedUserId;
+      if (valid) {
+        accountUser = data.user;
+        accountValidatedAt = Date.now();
+        return true;
+      }
+    } catch (err) {
+      console.error('Session verification failed:', err);
+    }
+    if (accountUser && accountUser.id === expectedUserId) {
+      await invalidateAccount(message || 'Din inloggning kunde inte verifieras. Logga in igen.');
+    }
+    return false;
+  })();
+  return accountValidationPromise.finally(() => { accountValidationPromise = null; });
+}
 
 function safeNumber(value, fallback, min, max) {
   const n = Number(value);
@@ -303,34 +334,47 @@ async function loadCloudGame() {
 }
 
 async function loadAccountProfile() {
-  const { data } = await supabaseClient.from('profiles').select('username').eq('id', accountUser.id).maybeSingle();
-  accountProfile = data || { username: accountUser.email || 'Player' };
+  const { data, error } = await supabaseClient.from('profiles').select('username').eq('id', accountUser.id).maybeSingle();
+  if (error || !data) return false;
+  accountProfile = data;
   accountNameEl.textContent = accountProfile.username;
+  return true;
 }
 
 async function activateAccount(session) {
   accountUser = session.user;
-  await loadAccountProfile();
+  accountValidatedAt = 0;
+  if (!await verifyAccountSession('Kontot finns inte längre eller sessionen har gått ut. Logga in igen.')) return;
+  if (!await loadAccountProfile()) {
+    await invalidateAccount('Kontot saknar en giltig spelarprofil. Logga in igen.');
+    return;
+  }
   await loadCloudGame();
+  if (!isGameAuthenticated()) return;
   hideAuthOverlay();
   if (state === 'auth') state = 'start';
   show('ov-start');
 }
 
-async function deactivateAccount(message) {
+function deactivateAccount(message) {
+  const wasAlreadyLocked = state === 'auth';
   accountUser = null;
   accountProfile = null;
+  accountValidatedAt = 0;
   pendingCloudState = null;
   cloudGameActive = false;
   cloudRevision = 0;
   cloudDirty = false;
   pendingGameEvents.length = 0;
+  newGameBtn.hidden = true;
   if (typeof releaseAllTouchInput === 'function') releaseAllTouchInput();
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (!message && !wasAlreadyLocked) setAuthMessage('');
   showAuthOverlay(message);
 }
 
 function startAuthenticatedGame(forceNew) {
-  if (!accountUser) { showAuthOverlay('Logga in för att spela.'); return false; }
+  if (!isGameAuthenticated()) { showAuthOverlay('Logga in med ett giltigt konto för att spela.'); return false; }
   if (!forceNew && pendingCloudState) {
     const saved = pendingCloudState;
     pendingCloudState = null;
@@ -399,28 +443,29 @@ document.getElementById('accountSave').addEventListener('click', e => {
   saveCloudGame(true);
 });
 
-document.getElementById('accountLogout').addEventListener('click', async e => {
+async function logoutAccount(e) {
+  e.preventDefault();
   e.stopPropagation();
   if (state === 'playing' && typeof pauseGame === 'function') pauseGame();
   await saveCloudGame(true);
   await flushGameEvents();
-  await supabaseClient.auth.signOut();
-});
+  try { await supabaseClient.auth.signOut({ scope: 'local' }); }
+  finally { deactivateAccount(); }
+}
+
+document.getElementById('accountLogout').addEventListener('click', logoutAccount);
+document.getElementById('pauseLogout').addEventListener('click', logoutAccount);
 
 newGameBtn.addEventListener('click', e => {
   e.preventDefault();
   e.stopPropagation();
   if (!confirm('Starta ett nytt spel? Din nuvarande molnsparning ersätts vid nästa sparning.')) return;
-  startAuthenticatedGame(true);
-  ensureAudio();
-  if (TOUCH_DEVICE) {
-    state = 'playing'; show(null); clock.getDelta();
-  } else renderer.domElement.requestPointerLock();
+  requestNewAuthenticatedGame();
 });
 
 supabaseClient.auth.onAuthStateChange((event, session) => {
   setTimeout(() => {
-    if (session && (!accountUser || accountUser.id !== session.user.id)) activateAccount(session);
+    if (event !== 'INITIAL_SESSION' && session && (!accountUser || accountUser.id !== session.user.id)) activateAccount(session);
     else if (!session && event === 'SIGNED_OUT') deactivateAccount();
   }, 0);
 });
@@ -429,13 +474,23 @@ async function initializeAccount() {
   state = 'auth';
   const { data, error } = await supabaseClient.auth.getSession();
   if (error || !data.session) deactivateAccount();
-  else activateAccount(data.session);
+  else await activateAccount(data.session);
   cloudAutosaveTimer = setInterval(() => {
+    if (accountUser && Date.now() - accountValidatedAt >= 15000) {
+      verifyAccountSession('Kontot eller sessionen är inte längre giltig. Logga in igen.');
+    }
     if (state === 'playing' && cloudGameActive && (cloudDirty || Date.now() - lastCloudSaveAt > 30000)) {
       cloudDirty = true;
       saveCloudGame(false);
     }
   }, 15000);
 }
+
+addEventListener('focus', () => {
+  if (accountUser) verifyAccountSession('Kontot eller sessionen är inte längre giltig. Logga in igen.');
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && accountUser) verifyAccountSession('Kontot eller sessionen är inte längre giltig. Logga in igen.');
+});
 
 initializeAccount();

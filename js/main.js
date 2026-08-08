@@ -115,6 +115,60 @@ function pauseGame() {
   if (typeof saveCloudGame === 'function') saveCloudGame(false);
 }
 
+let overlayAuthPending = false;
+let pointerLockAuthPending = false;
+
+function enterPlayingState() {
+  state = 'playing';
+  show(null);
+  clock.getDelta();
+}
+
+async function runAuthenticatedOverlayAction(forceNew) {
+  if (overlayAuthPending) return;
+  if (typeof isGameAuthenticated !== 'function' || !isGameAuthenticated()) {
+    showAuthOverlay('Logga in med ett giltigt konto för att spela.');
+    return;
+  }
+
+  overlayAuthPending = true;
+  const actionState = state;
+  ensureAudio();
+
+  if (!TOUCH_DEVICE) {
+    pointerLockAuthPending = true;
+    try { renderer.domElement.requestPointerLock(); } catch (err) { pointerLockAuthPending = false; }
+  }
+
+  const valid = await verifyAccountSession('Kontot eller sessionen är inte längre giltig. Logga in igen.');
+  if (!valid) {
+    pointerLockAuthPending = false;
+    overlayAuthPending = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    return;
+  }
+
+  if (!TOUCH_DEVICE && document.pointerLockElement !== renderer.domElement) {
+    pointerLockAuthPending = false;
+    overlayAuthPending = false;
+    return;
+  }
+
+  let started = true;
+  if (forceNew || actionState === 'over') started = startAuthenticatedGame(true);
+  else if (actionState === 'start') started = startAuthenticatedGame(false);
+
+  pointerLockAuthPending = false;
+  overlayAuthPending = false;
+  if (!started) {
+    if (document.pointerLockElement) document.exitPointerLock();
+    return;
+  }
+  enterPlayingState();
+}
+
+function requestNewAuthenticatedGame() { return runAuthenticatedOverlayAction(true); }
+
 /* ---- input router (desktop) ---- */
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
@@ -174,35 +228,12 @@ document.addEventListener('mousemove', e => {
 });
 
 for (const ov of document.querySelectorAll('.overlay')) {
-  ov.addEventListener('click', () => {
-    if (typeof isGameAuthenticated === 'function' && !isGameAuthenticated()) {
-      showAuthOverlay('Logga in för att spela.');
-      return;
-    }
-    ensureAudio();
-    if (state === 'start') {
-      const started = startAuthenticatedGame(false);
-      if (!started) return;
-    } else if (state === 'over') {
-      const started = startAuthenticatedGame(true);
-      if (!started) return;
-    }
-    if (TOUCH_DEVICE) {
-      // touch: no pointer lock, start/resume immediately from this same user gesture
-      state = 'playing';
-      show(null);
-      clock.getDelta();
-    } else {
-      renderer.domElement.requestPointerLock();
-    }
-  });
+  ov.addEventListener('click', () => runAuthenticatedOverlayAction(false));
 }
 
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement === renderer.domElement) {
-    state = 'playing';
-    show(null);
-    clock.getDelta(); // discard time spent in menus
+    if (!pointerLockAuthPending) enterPlayingState();
   } else if (state === 'playing') {
     state = 'paused';
     shooting = aiming = false;
