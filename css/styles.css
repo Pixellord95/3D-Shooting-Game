@@ -1,0 +1,416 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overscroll-behavior: none; }
+body {
+  overflow: hidden; font-family: 'Segoe UI', Arial, sans-serif; background: #000;
+  height: 100dvh;
+  touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+canvas { display: block; touch-action: none; }
+
+/* ---- desktop vs touch visibility helpers ---- */
+.touch-only { display: none; }
+body.touch-device .desktop-only { display: none; }
+body.touch-device .touch-only { display: block; }
+
+/* ---- HUD ---- */
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#crosshair {
+  position: absolute; top: 50%; left: 50%;
+  width: 0; height: 0;
+}
+#crosshair .t {
+  position: absolute; background: #fff;
+  box-shadow: 0 0 3px rgba(0,0,0,0.8);
+}
+#crosshair .t-l, #crosshair .t-r { top: -1px; width: 6px; height: 2px; }
+#crosshair .t-l { left: -15px; }
+#crosshair .t-r { left: 9px; }
+#crosshair .t-u, #crosshair .t-d { left: -1px; width: 2px; height: 6px; }
+#crosshair .t-u { top: -15px; }
+#crosshair .t-d { top: 9px; }
+#crosshair .dot {
+  position: absolute; top: -1.5px; left: -1.5px;
+  width: 3px; height: 3px; border-radius: 50%;
+  background: #fff; opacity: 0.85;
+}
+#hitmark {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  color: #fff; font-size: 26px; font-weight: bold;
+  text-shadow: 0 0 5px #000; opacity: 0; transition: opacity 0.12s;
+}
+#hitmark.kill { color: #ff5a4d; }
+#hitmark.pop { animation: hmPop 0.16s ease-out; }
+@keyframes hmPop {
+  0% { transform: translate(-50%, -50%) scale(0.6); }
+  55% { transform: translate(-50%, -50%) scale(1.45); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+#threatArrow {
+  position: fixed; top: 50%; left: 50%; width: 0; height: 0;
+  transform: translate(-50%, -50%) rotate(0deg);
+  opacity: 0; transition: opacity 0.15s;
+}
+#threatArrow .tip {
+  position: absolute; left: -9px; top: -190px;
+  width: 0; height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 18px solid #ff3b3b;
+  filter: drop-shadow(0 0 5px rgba(255, 59, 59, 0.7)) drop-shadow(0 1px 2px #000);
+}
+#reloadwrap {
+  position: absolute; top: calc(50% + 30px); left: 50%;
+  transform: translateX(-50%);
+  width: 130px; height: 6px; border-radius: 3px;
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.35);
+  display: none;
+}
+#reloadfill { height: 100%; width: 0%; background: #ffd34d; border-radius: 3px; }
+#topbar {
+  position: absolute; top: 14px; left: 18px;
+  color: #fff; text-shadow: 0 1px 3px #000;
+  font-size: 15px; line-height: 1.65;
+  background: rgba(10, 18, 34, 0.55);
+  padding: 8px 14px; border-radius: 10px;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+}
+#topbar b { color: #ffd34d; }
+#wave-banner {
+  position: absolute; top: 22%; width: 100%;
+  text-align: center; color: #ffd34d;
+  font-size: 34px; font-weight: bold;
+  text-shadow: 0 2px 8px #000;
+  opacity: 0; transition: opacity 0.4s;
+}
+#wave-banner.pop { animation: bannerIn 0.5s ease-out; }
+@keyframes bannerIn {
+  0% { transform: translateY(-18px) scale(0.8); }
+  60% { transform: translateY(3px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+#bossbars {
+  position: absolute; top: 60px; left: 50%;
+  transform: translateX(-50%);
+  width: 330px; display: flex; flex-direction: column; gap: 6px;
+}
+.bossbar {
+  background: rgba(10, 18, 34, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px; padding: 4px 9px 6px;
+}
+.bossbar .bn {
+  font-size: 12px; color: #fff; letter-spacing: 1.5px;
+  text-shadow: 0 1px 2px #000;
+}
+.bossbar .bw {
+  height: 8px; margin-top: 3px; position: relative;
+  background: rgba(0, 0, 0, 0.55); border-radius: 4px; overflow: hidden;
+}
+.bossbar .bf { height: 100%; width: 100%; transition: width 0.25s; border-radius: 4px; }
+.bossbar .bs {
+  position: absolute; top: 0; left: 0; height: 100%; width: 0%;
+  background: rgba(130, 205, 255, 0.85); transition: width 0.2s;
+}
+#minimap {
+  position: absolute; top: 14px; right: 14px;
+  width: 160px; height: 160px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(10, 18, 34, 0.5);
+  opacity: 0.92;
+}
+#healthwrap {
+  position: absolute; bottom: 20px; left: 18px;
+  width: 250px;
+  background: rgba(10, 18, 34, 0.55);
+  padding: 8px 12px 10px; border-radius: 10px;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+}
+#healthwrap span { color: #fff; font-size: 12px; letter-spacing: 1px; text-shadow: 0 1px 3px #000; }
+#healthbar {
+  height: 15px; margin-top: 4px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 4px; overflow: hidden;
+}
+#healthfill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #3fbf5f, #6fe08a);
+  transition: width 0.2s, background 0.3s;
+}
+#resbar {
+  position: absolute; bottom: 92px; left: 18px;
+  display: flex; gap: 8px;
+}
+.res {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(10, 18, 34, 0.55); border: 1px solid rgba(120, 180, 255, 0.25);
+  border-radius: 8px; padding: 5px 10px;
+  color: #fff; font-size: 14px; text-shadow: 0 1px 2px #000;
+}
+.res i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+#equip {
+  position: absolute; bottom: 20px; right: 18px;
+  display: flex; gap: 7px;
+}
+.slot {
+  width: 50px; height: 50px; border-radius: 9px;
+  background: rgba(10, 18, 34, 0.6);
+  border: 2px solid rgba(140, 170, 220, 0.35);
+  color: #dfe8f5; font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; transition: border-color 0.12s, transform 0.12s;
+}
+.slot .key {
+  position: absolute; top: 2px; left: 5px;
+  font-size: 10px; color: #9fb4d4;
+}
+.slot.active { border-color: #ffd34d; transform: translateY(-4px); box-shadow: 0 0 12px rgba(255, 211, 77, 0.35); }
+#ammo {
+  position: absolute; bottom: 80px; right: 18px;
+  color: #fff; font-size: 24px; font-weight: bold;
+  text-shadow: 0 2px 5px #000; text-align: right;
+}
+#ammo small { font-size: 14px; color: #aabdd8; font-weight: normal; }
+#buildinfo {
+  position: absolute; top: calc(50% + 44px); left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 40, 25, 0.6); border: 1px solid rgba(140, 230, 140, 0.45);
+  border-radius: 8px; padding: 4px 12px;
+  color: #d8ffd8; font-size: 13px; letter-spacing: 1.5px;
+  display: none; white-space: nowrap;
+}
+#msg {
+  position: absolute; bottom: 26%; width: 100%;
+  text-align: center; color: #fff; font-size: 17px;
+  text-shadow: 0 1px 4px #000; opacity: 0; transition: opacity 0.15s;
+}
+#gain {
+  position: absolute; top: 56%; left: 50%;
+  transform: translate(-50%, 0);
+  color: #ffd34d; font-size: 18px; font-weight: bold;
+  text-shadow: 0 1px 4px #000; opacity: 0; pointer-events: none;
+}
+#gain.pop { animation: rise 0.9s ease-out; }
+@keyframes rise {
+  0% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -46px); }
+}
+#vignette {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(200, 20, 20, 0.55) 100%);
+  opacity: 0; transition: opacity 0.5s;
+}
+#scope {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at center, transparent 0, transparent 21vh, #000 21.4vh);
+  opacity: 0; transition: opacity 0.08s;
+}
+#scope .line { position: absolute; background: rgba(15, 15, 15, 0.85); }
+#scope .line.h { top: 50%; left: calc(50% - 21vh); width: 42vh; height: 1px; transform: translateY(-50%); }
+#scope .line.v { left: 50%; top: calc(50% - 21vh); height: 42vh; width: 1px; transform: translateX(-50%); }
+#scope .dot {
+  position: absolute; top: 50%; left: 50%;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(15, 15, 15, 0.9); transform: translate(-50%, -50%);
+}
+
+/* ---- overlays ---- */
+.overlay {
+  position: fixed; inset: 0; z-index: 10;
+  background: rgba(5, 8, 16, 0.85);
+  display: none; align-items: center; justify-content: center;
+  text-align: center; color: #dfe8f5; cursor: pointer;
+}
+.overlay.show { display: flex; }
+.overlay h1 { font-size: 44px; color: #ffd34d; margin-bottom: 14px; letter-spacing: 2px; }
+.overlay p { font-size: 15px; line-height: 1.9; color: #a8b8cf; }
+.overlay .go { margin-top: 24px; font-size: 20px; color: #fff; animation: pulse 1.4s infinite; }
+@keyframes pulse { 50% { opacity: 0.4; } }
+kbd {
+  background: #2a3448; border: 1px solid #4a5a78; border-radius: 4px;
+  padding: 1px 7px; font-family: inherit; color: #fff;
+}
+
+/* ==================== touch / mobile ==================== */
+
+/* hide all touch controls unless an overlay (start/pause/death) is covering the screen anyway;
+   z-index also kept below .overlay's (10) as a defense-in-depth backstop */
+#touchControls { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+body.overlay-active #touchControls { display: none; }
+
+/* ---- touch-device HUD repositioning: free up the entire bottom band for the
+   joystick + action buttons by moving health/resources/ammo/equip/minimap to the top ---- */
+/* #hud itself stays pointer-events:none (health/ammo/minimap must never block touch), but it
+   needs to sit ABOVE #touchControls (z-index 5) in paint order, or #lookZone — which covers the
+   entire right ~56% of the screen top-to-bottom — would win every hit-test over #equip's slots,
+   which visually sit inside that same region. Raising #hud's stacking context and then opting
+   #equip/.slot back into pointer-events:auto (below) fixes the actual hit-testing, not just the
+   event handlers. Stays below .overlay's z-index 10, so overlay menus are still topmost. */
+body.touch-device #hud { z-index: 6; }
+body.touch-device #topbar { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); font-size: 12px; padding: 6px 10px; line-height: 1.5; }
+body.touch-device #healthwrap {
+  bottom: auto; top: calc(max(8px, env(safe-area-inset-top)) + 66px);
+  left: max(8px, env(safe-area-inset-left)); width: 180px; padding: 6px 10px 8px;
+}
+body.touch-device #resbar { bottom: auto; top: calc(max(8px, env(safe-area-inset-top)) + 118px); left: max(8px, env(safe-area-inset-left)); }
+body.touch-device #minimap { width: 100px; height: 100px; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+body.touch-device #ammo { bottom: auto; top: calc(max(8px, env(safe-area-inset-top)) + 108px); right: max(8px, env(safe-area-inset-right)); font-size: 18px; }
+body.touch-device #equip {
+  bottom: auto; top: calc(max(8px, env(safe-area-inset-top)) + 146px); right: max(8px, env(safe-area-inset-right)); left: auto;
+  max-width: 46vw; overflow-x: auto; gap: 5px; justify-content: flex-end;
+  pointer-events: auto; /* must opt back in — #hud is pointer-events:none */
+}
+body.touch-device .slot {
+  width: 44px; height: 44px; border-radius: 8px; font-size: 17px; flex: none;
+  pointer-events: auto; touch-action: none; /* ~44x44 touch target; touch-action:none stops the
+    browser from treating a slot tap as a scroll/zoom gesture or letting it fall through to the
+    canvas behind it and rotate the camera */
+}
+body.touch-device .slot .key { display: none; } /* no keyboard digits to show on touch */
+body.touch-device #bossbars { top: 128px; width: 250px; }
+body.touch-device #buildinfo { top: 18px; }
+
+/* ---- left analog joystick ---- */
+#joyBase {
+  position: fixed; touch-action: none;
+  left: calc(max(18px, env(safe-area-inset-left)) + 22px);
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 24px);
+  width: 124px; height: 124px; border-radius: 50%;
+  background: rgba(20, 30, 45, 0.35); border: 2px solid rgba(200, 220, 255, 0.35);
+  pointer-events: none;
+}
+body.touch-device #joyBase { pointer-events: auto; }
+#joyBase.active { background: rgba(20, 30, 45, 0.5); border-color: rgba(255, 211, 77, 0.55); }
+#joyKnob {
+  position: absolute; top: 50%; left: 50%; width: 56px; height: 56px;
+  margin: -28px 0 0 -28px; border-radius: 50%;
+  background: rgba(220, 232, 245, 0.55); border: 2px solid rgba(255, 255, 255, 0.6);
+  transition: background 0.1s;
+}
+#joyBase.active #joyKnob { background: rgba(255, 211, 77, 0.65); }
+
+/* ---- look zone: right portion of the screen, drag to rotate camera/aim ---- */
+#lookZone {
+  position: fixed; touch-action: none;
+  top: 0; bottom: 0; left: 44%; right: 0;
+  pointer-events: none;
+}
+body.touch-device #lookZone { pointer-events: auto; }
+
+/* ---- action buttons ---- */
+.tbtn {
+  position: fixed; touch-action: none; pointer-events: none;
+  display: none; align-items: center; justify-content: center;
+  border-radius: 16px; background: rgba(15, 22, 34, 0.5);
+  border: 2px solid rgba(200, 220, 255, 0.4); color: #eaf1fb;
+  font: 700 12px/1.1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px;
+  -webkit-tap-highlight-color: transparent; padding: 0;
+}
+body.touch-device .tbtn { display: flex; pointer-events: auto; }
+.tbtn.active { background: rgba(255, 211, 77, 0.38); border-color: #ffd34d; transform: scale(0.94); }
+
+/* Fire sits alone near the bottom-right corner, pulled in from the edge and further up
+   than the other buttons so it reads like a traditional mobile-FPS fire button rather
+   than a corner-docked icon. Every other action button shares one row above it (same
+   "bottom" offset) so the cluster stays as flat/short as possible — tall stacking here
+   is what collided with the top-anchored equip row on short phone-landscape heights
+   (~360-400px). The row's bottom offset (150px) clears FIRE's new taller/higher-set top
+   edge (34 + 104 = 138px above the safe-area baseline) with margin, so it no longer
+   matters that FIRE's bigger footprint now overlaps the row horizontally. */
+#btnFire {
+  width: 104px; height: 104px; font-size: 16px;
+  right: calc(max(16px, env(safe-area-inset-right)) + 24px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 34px);
+  background: rgba(196, 60, 48, 0.4); border-color: rgba(255, 140, 120, 0.55);
+}
+#btnFire.active { background: rgba(226, 70, 55, 0.6); border-color: #ff8c78; }
+
+#btnReload {
+  width: 56px; height: 56px;
+  right: calc(max(16px, env(safe-area-inset-right)) + 96px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px);
+}
+#btnAim {
+  width: 62px; height: 62px;
+  right: calc(max(16px, env(safe-area-inset-right)) + 160px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px);
+}
+#btnAim.active { background: rgba(90, 200, 255, 0.4); border-color: #7fd8ff; }
+#btnBuild, #btnDown {
+  width: 50px; height: 50px; font-size: 20px;
+  right: calc(max(16px, env(safe-area-inset-right)) + 230px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px);
+}
+#btnInteract {
+  width: 52px; height: 52px; font-size: 16px;
+  right: calc(max(16px, env(safe-area-inset-right)) + 288px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px);
+}
+#btnJump, #btnUp {
+  width: 60px; height: 60px;
+  right: calc(max(16px, env(safe-area-inset-right)) + 348px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px);
+}
+#btnPause {
+  width: 42px; height: 42px; font-size: 16px;
+  top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+}
+#btnPause.active { transform: translateX(-50%) scale(0.94); }
+
+/* heli mode reuses the jump/build slots for up/down; hidden otherwise */
+#btnUp, #btnDown { display: none; }
+body.touch-device.mode-heli #btnUp, body.touch-device.mode-heli #btnDown { display: flex; }
+body.mode-heli #btnJump, body.mode-heli #btnBuild { display: none; }
+
+body.mode-vehicle #btnFire, body.mode-vehicle #btnAim, body.mode-vehicle #btnReload, body.mode-vehicle #btnBuild {
+  display: none;
+}
+
+body.mode-build #btnFire, body.mode-build #btnAim { display: none; }
+
+/* ---- build panel: shown only in build mode, in the bottom-right band that FIRE/AIM
+   (both hidden while building) would otherwise occupy — anchored to the joystick's
+   right edge and the screen's right edge, so it can't overlap either at any width. ---- */
+#buildPanel {
+  position: fixed; touch-action: none;
+  left: calc(max(18px, env(safe-area-inset-left)) + 150px);
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: none; gap: 6px; overflow-x: auto;
+  justify-content: flex-end; align-items: center;
+  pointer-events: none;
+}
+body.mode-build.touch-device #buildPanel { display: flex; pointer-events: auto; }
+.bbtn {
+  flex: none; touch-action: none; -webkit-tap-highlight-color: transparent;
+  min-width: 50px; height: 48px; padding: 0 8px;
+  border-radius: 10px; background: rgba(20, 40, 25, 0.55); border: 2px solid rgba(140, 230, 140, 0.45);
+  color: #d8ffd8; font: 700 11px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.3px;
+}
+.bbtn.active { background: rgba(140, 230, 140, 0.4); border-color: #d8ffd8; }
+.bbtn-place { background: rgba(255, 211, 77, 0.3); border-color: #ffd34d; color: #fff; }
+
+/* ---- compact landscape: short phone-landscape heights (~360-430px, e.g. 844x390 and
+   667x375 — both explicitly designed for) don't have enough vertical room to stack the
+   top-anchored minimap/ammo/equip AND the (now taller/higher) FIRE button + raised action
+   row without the two bands colliding. Rather than shrinking FIRE back down or violating
+   the ~44px slot touch-target floor, this tightens only the top-right HUD stack (minimap/
+   ammo/equip) so FIRE, the action row and the joystick can keep their normal positions on
+   every supported size. Verified empirically (getBoundingClientRect + overlap checks) at
+   both 844x390 and 667x375 — re-check with the same method if these numbers are touched. */
+@media (max-height: 430px) {
+  body.touch-device #minimap { width: 58px; height: 58px; }
+  body.touch-device #ammo { top: calc(max(8px, env(safe-area-inset-top)) + 62px); font-size: 15px; }
+  body.touch-device #equip { top: calc(max(8px, env(safe-area-inset-top)) + 88px); }
+}
+
+/* ---- portrait nudge: informational only, never blocks input or crashes the game ---- */
+#rotateOverlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  padding: 6px 10px; padding-top: calc(6px + env(safe-area-inset-top));
+  text-align: center; font-size: 13px; color: #ffe9a0;
+  background: rgba(10, 18, 34, 0.75); pointer-events: none;
+}
+body.touch-device.portrait-warning #rotateOverlay { display: block; }

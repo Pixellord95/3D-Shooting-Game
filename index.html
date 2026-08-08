@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Cube Assault 3D</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="overlay-active">
+
+<div id="hud">
+  <div id="crosshair">
+    <i class="t t-l"></i><i class="t t-r"></i><i class="t t-u"></i><i class="t t-d"></i>
+    <i class="dot"></i>
+  </div>
+  <div id="hitmark">✕</div>
+  <div id="threatArrow"><div class="tip"></div></div>
+  <div id="reloadwrap"><div id="reloadfill"></div></div>
+  <div id="topbar">
+    Wave <b id="h-wave">1</b> &nbsp;·&nbsp; Enemies <b id="h-left">0</b><br>
+    Score <b id="h-score">0</b>
+  </div>
+  <div id="wave-banner"></div>
+  <div id="bossbars"></div>
+  <div id="resbar">
+    <span class="res"><i style="background:#b8793f"></i><b id="res-wood">0</b></span>
+    <span class="res"><i style="background:#8f8f8f"></i><b id="res-stone">0</b></span>
+    <span class="res"><i style="background:#7e93a8"></i><b id="res-metal">0</b></span>
+  </div>
+  <div id="healthwrap">
+    <span>HEALTH</span>
+    <div id="healthbar"><div id="healthfill"></div></div>
+  </div>
+  <div id="buildinfo">WALL · WOOD</div>
+  <div id="ammo">30 <small>/ 120</small></div>
+  <div id="equip">
+    <div class="slot" id="slot-0"><span class="key">1</span>⛏</div>
+    <div class="slot active" id="slot-1"><span class="key">2</span>🔫</div>
+    <div class="slot" id="slot-2"><span class="key">3</span>💥</div>
+    <div class="slot" id="slot-3"><span class="key">4</span>🚀</div>
+    <div class="slot" id="slot-4"><span class="key">5</span>🔥</div>
+    <div class="slot" id="slot-5"><span class="key">6</span>🎯</div>
+    <div class="slot" id="slot-6"><span class="key">7</span>⚙️</div>
+    <div class="slot" id="slot-b"><span class="key">Q</span>🧱</div>
+  </div>
+  <div id="msg"></div>
+  <div id="gain"></div>
+  <canvas id="minimap" width="160" height="160"></canvas>
+</div>
+<div id="vignette"></div>
+<div id="scope"><div class="line h"></div><div class="line v"></div><div class="dot"></div></div>
+
+<div class="overlay show" id="ov-start">
+  <div>
+    <h1>CUBE ASSAULT</h1>
+    <p class="desktop-only">
+      <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · <kbd>Space</kbd> jump · Mouse look<br>
+      <b>LMB</b> fire / swing / place · <b>RMB</b> aim / rotate build · <kbd>R</kbd> reload · wheel cycles gear<br>
+      <kbd>1</kbd>–<kbd>7</kbd> pickaxe / rifle / shotgun / bazooka / AK-47 / sniper / machine gun · <kbd>Q</kbd> build mode (wheel cycles piece)<br>
+      <kbd>R</kbd>/<kbd>Shift+R</kbd> rotate build · <kbd>M</kbd> material · click doors to open · <kbd>E</kbd> drive / fly / search<br>
+      Harvest trees, rocks and scrap. Build cover. Survive the waves.
+    </p>
+    <p class="touch-only">
+      Left stick to move · drag the right side of the screen to look<br>
+      FIRE to shoot/swing/place · ADS to aim · tap a slot to equip<br>
+      Harvest trees, rocks and scrap. Build cover. Survive the waves.
+    </p>
+    <div class="go desktop-only">▶ Click to Play</div>
+    <div class="go touch-only">▶ Tap to Play</div>
+  </div>
+</div>
+<div class="overlay" id="ov-pause">
+  <div>
+    <h1>PAUSED</h1>
+    <div class="go desktop-only">▶ Click to Resume</div>
+    <div class="go touch-only">▶ Tap to Resume</div>
+  </div>
+</div>
+<div class="overlay" id="ov-over">
+  <div>
+    <h1>YOU DIED</h1>
+    <p id="over-stats"></p>
+    <div class="go desktop-only">▶ Click to Retry</div>
+    <div class="go touch-only">▶ Tap to Retry</div>
+  </div>
+</div>
+
+<!-- touch controls: only shown on coarse-pointer/touch devices (see body.touch-device in styles.css) -->
+<div id="touchControls">
+  <div id="joyBase" class="joy-base"><div id="joyKnob" class="joy-knob"></div></div>
+  <div id="lookZone"></div>
+
+  <button type="button" id="btnPause" class="tbtn tbtn-pause" aria-label="Pause">⏸</button>
+
+  <button type="button" id="btnFire" class="tbtn tbtn-fire" aria-label="Fire">FIRE</button>
+  <button type="button" id="btnAim" class="tbtn tbtn-aim" aria-label="Aim">ADS</button>
+  <button type="button" id="btnJump" class="tbtn tbtn-jump" aria-label="Jump">JUMP</button>
+  <button type="button" id="btnReload" class="tbtn tbtn-reload" aria-label="Reload">RELOAD</button>
+  <button type="button" id="btnInteract" class="tbtn tbtn-interact" aria-label="Interact">E</button>
+  <button type="button" id="btnBuild" class="tbtn tbtn-buildtoggle" aria-label="Build mode">🧱</button>
+  <button type="button" id="btnUp" class="tbtn tbtn-up" aria-label="Up">▲</button>
+  <button type="button" id="btnDown" class="tbtn tbtn-down" aria-label="Down">▼</button>
+
+  <div id="buildPanel">
+    <button type="button" class="bbtn" data-build="wall">WALL</button>
+    <button type="button" class="bbtn" data-build="window">WIN</button>
+    <button type="button" class="bbtn" data-build="ramp">RAMP</button>
+    <button type="button" class="bbtn" data-build="floor">FLOOR</button>
+    <button type="button" class="bbtn" id="btnMaterial">MAT</button>
+    <button type="button" class="bbtn bbtn-place" id="btnPlace">PLACE</button>
+    <button type="button" class="bbtn" id="btnExitBuild">EXIT</button>
+  </div>
+</div>
+<div id="rotateOverlay">⟳ Rotate your device</div>
+
+<script src="lib/three.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/world.js"></script>
+<script src="js/player.js"></script>
+<script src="js/items.js"></script>
+<script src="js/build.js"></script>
+<script src="js/pickups.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/car.js"></script>
+<script src="js/heli.js"></script>
+<script src="js/mobile.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

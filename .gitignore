@@ -1,0 +1,19 @@
+# Installed packages
+node_modules/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Supabase temporary files
+supabase/.temp/
+supabase/.branches/
+
+# Old local backup
+_backup_before_restructure/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
