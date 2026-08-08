@@ -36,6 +36,34 @@ function setAuthBusy(busy) {
   authOverlayEl.classList.toggle('busy', busy);
 }
 
+function signupErrorMessage(error) {
+  const code = String(error && error.code || '').toLowerCase();
+  const message = String(error && error.message || '').toLowerCase();
+  const status = Number(error && error.status || 0);
+  if (code === 'over_email_send_rate_limit' || status === 429 || message.includes('rate limit')) {
+    return 'För många bekräftelsemejl har skickats från spelet. Vänta ungefär en timme och försök igen, eller konfigurera Custom SMTP i Supabase.';
+  }
+  if (code === 'email_address_invalid' || message.includes('invalid email')) {
+    return 'E-postadressen godkänns inte. Kontrollera adressen och försök igen.';
+  }
+  if (code === 'email_address_not_authorized') {
+    return 'Supabases testmejl får inte skickas till den adressen. Konfigurera Custom SMTP i Supabase innan spelet öppnas för fler användare.';
+  }
+  if (code === 'weak_password') {
+    return 'Lösenordet är för svagt. Välj minst 8 tecken och blanda gärna bokstäver, siffror och symboler.';
+  }
+  if (code === 'signup_disabled') {
+    return 'Nya registreringar är tillfälligt avstängda.';
+  }
+  if (code === 'user_already_exists' || code === 'email_exists' || message.includes('already registered')) {
+    return 'Det finns redan ett konto med den e-postadressen. Prova att logga in.';
+  }
+  if (message.includes('database error saving new user')) {
+    return 'Kontot kunde inte sparas. Prova ett annat användarnamn eller försök igen om en stund.';
+  }
+  return 'Kontot kunde inte skapas just nu. Försök igen om en stund.';
+}
+
 function selectAuthTab(tab) {
   const registering = tab === 'register';
   authLoginForm.hidden = registering;
@@ -421,6 +449,20 @@ authRegisterForm.addEventListener('submit', async e => {
     return;
   }
   setAuthBusy(true);
+  setAuthMessage('Kontrollerar användarnamnet…');
+  const { data: usernameAvailable, error: usernameError } = await supabaseClient
+    .rpc('is_username_available', { candidate: username });
+  if (usernameError) {
+    console.error('Username availability check failed:', usernameError.message);
+    setAuthMessage('Kunde inte kontrollera användarnamnet. Försök igen om en stund.', 'error');
+    setAuthBusy(false);
+    return;
+  }
+  if (!usernameAvailable) {
+    setAuthMessage('Användarnamnet är redan upptaget. Välj ett annat.', 'error');
+    setAuthBusy(false);
+    return;
+  }
   setAuthMessage('Skapar konto…');
   const redirectTo = location.origin + location.pathname;
   const { data, error } = await supabaseClient.auth.signUp({
@@ -429,7 +471,8 @@ authRegisterForm.addEventListener('submit', async e => {
     options: { data: { username }, emailRedirectTo: redirectTo },
   });
   if (error) {
-    setAuthMessage('Kontot kunde inte skapas. E-post eller användarnamn kan redan vara upptaget.', 'error');
+    console.error('Signup failed:', error.code || error.status || '', error.message);
+    setAuthMessage(signupErrorMessage(error), 'error');
   } else if (!data.session) {
     selectAuthTab('login');
     setAuthMessage('Kontot är skapat. Kontrollera din e-post och bekräfta kontot innan du loggar in.', 'success');
