@@ -1,0 +1,27 @@
+{
+  "name": "3d-shooting-game",
+  "version": "1.0.0",
+  "description": "A browser-based first-person shooter / battle-builder built with plain [Three.js](https://threejs.org/) — no build tools, no frameworks, no dependencies beyond the bundled `three.min.js`. Fight waves of enemies and minibosses, harvest resources, build defensive structures (walls, windows, doors, ramps, floors), and drive a car or fly a helicopter gunship around an open 320×320 unit map, all rendered with procedurally generated low-poly models and a tiny synthesized sound engine (Web Audio, no audio files). Fully playable with keyboard/mouse on desktop or touch controls on phones and tablets.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pixellord95/3D-Shooting-Game.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Pixellord95/3D-Shooting-Game/issues"
+  },
+  "homepage": "https://github.com/Pixellord95/3D-Shooting-Game#readme",
+  "devDependencies": {
+    "supabase": "^2.113.0"
+  }
+}
